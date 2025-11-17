@@ -14,6 +14,7 @@ export default async function handler(req, res) {
     const url = `https://maps.googleapis.com/maps/api/place/details/json`
       + `?place_id=${encodeURIComponent(placeId)}`
       + `&fields=rating,user_ratings_total,reviews`
+      + `&language=ko`
       + `&key=${process.env.GOOGLE_MAPS_API_KEY}`;
 
     const r = await fetch(url);
