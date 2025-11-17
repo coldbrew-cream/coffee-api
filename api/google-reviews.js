@@ -1,36 +1,6 @@
 export default async function handler(req, res) {
-  // CORS
-  const origin = req.headers.origin || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  try {
-    const { placeId } = req.query;
-    if (!placeId) return res.status(400).json({ error: "Missing placeId" });
-
-    const url = `https://maps.googleapis.com/maps/api/place/details/json`
-      + `?place_id=${encodeURIComponent(placeId)}`
-      + `&fields=rating,user_ratings_total,reviews`
-      + `&language=${language}`
-      + `&key=${process.env.GOOGLE_MAPS_API_KEY}`;
-
-    const r = await fetch(url);
-    const data = await r.json();
-
-    if (data.status && data.status !== "OK") {
-      return res.status(502).json({ error: data.status, details: data.error_message });
-    }
-
-    res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");
-
-    const result = data.result || {};
-    res.status(200).json({
-      rating: result.rating ?? null,export default async function handler(req, res) {
-  // CORS 허용
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // ===== CORS (맨 위에 고정) =====
+  res.setHeader('Access-Control-Allow-Origin', '*'); // 필요하면 나중에 Webflow 도메인으로 제한 가능
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
@@ -40,62 +10,44 @@ export default async function handler(req, res) {
   try {
     const { placeId, lang } = req.query;
 
+    // placeId 없으면 에러
     if (!placeId) {
       return res.status(400).json({ error: 'Missing placeId' });
     }
 
-    // 한글 또는 영어 결정
+    // 언어 결정 (ko / en)
     const language = lang === 'ko' ? 'ko' : 'en';
 
     const url =
-      'https://maps.googleapis.com/maps/api/place/details/json'
-      + `?place_id=${encodeURIComponent(placeId)}`
-      + '&fields=rating,user_ratings_total,reviews'
-      + `&language=${language}`
-      + `&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+      'https://maps.googleapis.com/maps/api/place/details/json' +
+      `?place_id=${encodeURIComponent(placeId)}` +
+      '&fields=rating,user_ratings_total,reviews' +
+      `&language=${language}` +
+      `&key=${process.env.GOOGLE_MAPS_API_KEY}`;
 
     const r = await fetch(url);
     const data = await r.json();
 
-    // API 오류 처리
+    // Google API 에러 처리
     if (!r.ok || (data.status && data.status !== 'OK')) {
       console.error('Google API error:', data);
       return res.status(502).json({
         error: data.status || 'GoogleAPIError',
-        details: data.error_message || null
+        details: data.error_message || null,
       });
     }
 
     const result = data.result || {};
     const reviews = Array.isArray(result.reviews) ? result.reviews : [];
 
-    // Webflow에서 사용하는 JSON 구조에 맞게 리턴
-    res.status(200).json({
+    // 캐시 헤더 (선택 사항)
+    res.setHeader(
+      'Cache-Control',
+      's-maxage=3600, stale-while-revalidate=86400'
+    );
+
+    // Webflow에서 쓰는 JSON 형태로 응답
+    return res.status(200).json({
       rating: result.rating ?? null,
       count: result.user_ratings_total ?? reviews.length ?? 0,
-      reviewsCount: result.user_ratings_total ?? reviews.length ?? 0,
-      reviews: reviews.map(rv => ({
-        author: rv.author_name,
-        rating: rv.rating,
-        text: rv.text
-      }))
-    });
-  } catch (err) {
-    console.error('ServerError:', err);
-    res.status(500).json({ error: 'ServerError' });
-  }
-}
-
-      reviewsCount: result.user_ratings_total ?? 0,
-      reviews: (result.reviews || []).map(v => ({
-        author: v.author_name,
-        text: v.text,
-        rating: v.rating,
-        time: v.time
-      }))
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-}
-
+      reviewsCount: result.user_ratings_total ?? reviews.lengt
